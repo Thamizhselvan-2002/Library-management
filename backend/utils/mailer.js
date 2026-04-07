@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 const { Resend } = require("resend");
 
 function getResend() {
@@ -10,6 +11,51 @@ async function sendMail(to, subject, html) {
   const resend = getResend();
 
   if (!resend) {
+=======
+const nodemailer = require("nodemailer");
+
+// Reset cached transporter on each call so env vars are always re-read
+// (important on Render where vars may load after module init)
+let _transporter = null;
+let _lastUser = null;
+
+function getTransporter() {
+  const user = process.env.EMAIL_USER;
+  const pass = process.env.EMAIL_PASS;
+
+  if (!user || user.includes("your_") || !pass || pass.includes("your_")) {
+    return null;
+  }
+
+  // Re-create if credentials changed
+  if (_transporter && _lastUser === user) return _transporter;
+
+  _lastUser = user;
+
+  // Try TLS port 587 first (more reliable on Render than 465)
+  _transporter = nodemailer.createTransport({
+    host: "smtp.gmail.com",
+    port: 587,
+    secure: false,           // STARTTLS on 587
+    auth: { user, pass },
+    tls: {
+      rejectUnauthorized: false,
+      ciphers: "SSLv3",
+    },
+    connectionTimeout: 20000,
+    greetingTimeout: 15000,
+    socketTimeout: 30000,
+    pool: false,
+  });
+
+  console.log("✉️  Mailer ready (STARTTLS/587):", user);
+  return _transporter;
+}
+
+async function sendMail(to, subject, html) {
+  const t = getTransporter();
+  if (!t) {
+>>>>>>> 0c4150890f6b725cf77abd6b1731ebacf044f257
     // Dev fallback — print OTP to console so it's still usable locally
     const otpMatch = html.match(/\b(\d{6})\b/);
     console.log("═══════════════════════════════════════");
@@ -20,14 +66,20 @@ async function sendMail(to, subject, html) {
   }
 
   try {
+<<<<<<< HEAD
     const fromAddress = process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
 
     const { data, error } = await resend.emails.send({
       from: `Libraria 📚 <${fromAddress}>`,
+=======
+    const info = await t.sendMail({
+      from: `"Libraria 📚" <${process.env.EMAIL_USER}>`,
+>>>>>>> 0c4150890f6b725cf77abd6b1731ebacf044f257
       to,
       subject,
       html,
     });
+<<<<<<< HEAD
 
     if (error) {
       console.error(`❌ Resend error:`, error);
@@ -46,6 +98,43 @@ async function sendMail(to, subject, html) {
       `2. Get a free API key from https://resend.com\n` +
       `Original error: ${err.message}`
     );
+=======
+    console.log(`✉️  Sent to ${to} — ${info.messageId}`);
+    return info;
+  } catch (err) {
+    console.error(`❌ Email error (port 587):`, err.message);
+
+    // Fallback: retry with port 465 SSL
+    console.log("   Retrying with port 465...");
+    try {
+      const fallback = nodemailer.createTransport({
+        host: "smtp.gmail.com",
+        port: 465,
+        secure: true,
+        auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
+        tls: { rejectUnauthorized: false },
+        connectionTimeout: 20000,
+        socketTimeout: 30000,
+      });
+      const info2 = await fallback.sendMail({
+        from: `"Libraria 📚" <${process.env.EMAIL_USER}>`,
+        to, subject, html,
+      });
+      console.log(`✉️  Sent via 465 to ${to}`);
+      return info2;
+    } catch (err2) {
+      console.error(`❌ Email also failed on 465:`, err2.message);
+      const otpMatch = html.match(/\b(\d{6})\b/);
+      if (otpMatch) console.log(`   OTP (check logs): ${otpMatch[1]}`);
+      throw new Error(
+        `Email delivery failed. Please verify:\n` +
+        `1. EMAIL_USER and EMAIL_PASS are set in Render Environment Variables\n` +
+        `2. Gmail App Password (16 chars, no spaces) — NOT your regular Gmail password\n` +
+        `3. 2-Step Verification is ON at myaccount.google.com/security\n` +
+        `Original error: ${err.message}`
+      );
+    }
+>>>>>>> 0c4150890f6b725cf77abd6b1731ebacf044f257
   }
 }
 
@@ -131,4 +220,8 @@ function fineNoticeTemplate(name, bookTitle, overdueDays, fineAmount) {
   </div></body></html>`;
 }
 
+<<<<<<< HEAD
 module.exports = { sendMail, registrationOTPTemplate, loginOTPTemplate, dueReminderTemplate, fineNoticeTemplate };
+=======
+module.exports = { sendMail, registrationOTPTemplate, loginOTPTemplate, dueReminderTemplate, fineNoticeTemplate };
+>>>>>>> 0c4150890f6b725cf77abd6b1731ebacf044f257
